@@ -114,7 +114,11 @@
   if (joinTarget) { show('pickRole', false); show('joinBox'); $('joinId').textContent = joinTarget.replace(PREFIX, ''); }
 
   async function unlockCamera() {
-    try { camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }); log('ได้สิทธิ์กล้องแล้ว', 'ok'); }
+    if (camStream) return;
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }); log('ได้สิทธิ์กล้องแล้ว', 'ok');
+      camStream.getTracks().forEach(t => { t.onended = () => log('กล้องถูกปิดโดยระบบ', 'warn'); t.onmute = () => log('กล้องถูกพัก (mute)', 'warn'); });
+    }
     catch (e) { log('ไม่ได้สิทธิ์กล้อง: ' + e.message + ' (อาจเชื่อมต่อในวงไม่ได้ ดูผลต่อ)', 'warn'); }
   }
   function begin(r) {
@@ -195,18 +199,47 @@
   function setGuestState(t, cls) { $('guestState').textContent = t; $('guestState').className = 'big ' + (cls || ''); }
 
   // ---------- shared ----------
+  // ---------- diagnostics: why does ICE drop? ----------
+  async function statsDump(c, tag) {
+    const pc = c.conn.peerConnection; if (!pc) return;
+    try {
+      const st = await pc.getStats(), by = {}; st.forEach(r => { by[r.id] = r; });
+      const cand = (x) => x ? `${x.candidateType}:${x.address || x.ip || '?'}:${x.port}/${x.protocol}${x.networkType ? '/' + x.networkType : ''}` : '-';
+      const lines = [];
+      st.forEach(r => {
+        if (r.type !== 'candidate-pair' || !(r.requestsSent || r.responsesReceived || r.state === 'succeeded')) return;
+        lines.push(`${r.state}${r.nominated ? '*' : ''} ส่ง=${r.bytesSent || 0}B รับ=${r.bytesReceived || 0}B เช็ก=${r.requestsSent || 0}/${r.responsesReceived || 0} ขอเช็ก=${r.requestsReceived || 0} L=${cand(by[r.localCandidateId])} R=${cand(by[r.remoteCandidateId])}`);
+      });
+      const locals = []; st.forEach(r => { if (r.type === 'local-candidate') locals.push(cand(r)); });
+      log(`[สถิติ ${tag}] ${c.name} pong=${c.pongs || 0} | ที่อยู่ฝั่งนี้: ${locals.join(', ') || 'ไม่มี'}`);
+      lines.forEach(l => log(`   คู่: ${l}`));
+    } catch (e) { log('อ่านสถิติไม่ได้: ' + e.message, 'warn'); }
+  }
+  function diag(c) {
+    let tries = 0;
+    const hook = () => {
+      const pc = c.conn.peerConnection;
+      if (!pc) { if (tries++ < 50) setTimeout(hook, 20); return; }
+      pc.addEventListener('icecandidate', e => log(`   ที่อยู่ฝั่งนี้: ${e.candidate ? e.candidate.candidate : '(ครบแล้ว)'}`));
+      pc.addEventListener('icecandidateerror', e => log(`   ice error ${e.errorCode} ${e.errorText} ${e.url || ''}`, 'warn'));
+      let n = 0; const iv = setInterval(() => { if (++n > 10 || pc.connectionState === 'closed') return clearInterval(iv); statsDump(c, `${n * 3}s`); }, 3000);
+    };
+    hook();
+  }
+
   function wire(c) {
+    diag(c);
     c.conn.on('data', m => onMessage(c, m));
     c.conn.on('close', () => {
       log(`${c.name} ปิดการเชื่อมต่อ`, 'bad'); renderPending(); renderPeers();
       if (role === 'guest' && conns.get(hostId) === c) { setGuestState('หลุดจากเครื่องแม่ กำลังต่อใหม่…', 'bad'); scheduleReconnect(); }
     });
     c.conn.on('error', e => log(`${c.name} error ${e.type || ''} ${e.message}`, 'bad'));
-    c.conn.on('iceStateChanged', s => { log(`${c.name} ice=${s}`, s === 'connected' ? 'ok' : (s === 'failed' || s === 'disconnected') ? 'bad' : ''); renderPeers(); });
+    c.conn.on('iceStateChanged', s => { log(`${c.name} ice=${s}`, s === 'connected' ? 'ok' : (s === 'failed' || s === 'disconnected') ? 'bad' : ''); if (s === 'disconnected' || s === 'failed') statsDump(c, 'ตอนหลุด'); renderPeers(); });
   }
   function onMessage(c, m) {
     if (m.type === 'ping') { c.conn.send({ type: 'pong', t: m.t }); return; }
-    if (m.type === 'pong') { c.lastPong = Date.now(); c.rtt = Math.round(performance.now() - m.t); return; }
+    if (m.type === 'pong') { c.pongs = (c.pongs || 0) + 1; c.lastPong = Date.now(); c.rtt = Math.round(performance.now() - m.t); return; }
     if (m.type === 'accepted') { c.accepted = true; c.name = 'เครื่องแม่ ' + m.host; setGuestState('เข้าร่วมวงแล้ว ✓', 'ok'); log('เครื่องแม่ยอมรับแล้ว', 'ok'); route(c); renderPeers(); return; }
     if (m.type === 'rejected') { setGuestState('เครื่องแม่ปฏิเสธ', 'bad'); clearTimeout(reconnectTimer); peer.destroy(); return; }
     if (m.type === 'chat') {
@@ -299,7 +332,7 @@
   });
   $('btnCopyLog').onclick = async () => { try { await navigator.clipboard.writeText(logLines.join('\n')); log('คัดลอกแล้ว', 'ok'); } catch (e) { log('คัดลอกไม่ได้: ' + e.message, 'bad'); } };
 
-  log(`โหลดหน้าแล้ว v2 | RTCPeerConnection=${typeof RTCPeerConnection !== 'undefined'} | PeerJS=${typeof Peer !== 'undefined'} | HTTPS=${location.protocol === 'https:'}`);
+  log(`โหลดหน้าแล้ว v2.1 | RTCPeerConnection=${typeof RTCPeerConnection !== 'undefined'} | PeerJS=${typeof Peer !== 'undefined'} | HTTPS=${location.protocol === 'https:'}`);
 })();
 </script>
 </body>
