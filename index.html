@@ -112,7 +112,7 @@
 
   $('devName').value = localStorage.getItem('spike_name') || '';
   const joinTarget = (/#join=([\w-]+)/.exec(location.hash) || [])[1];
-  if (joinTarget) { show('pickRole', false); show('joinBox'); $('joinId').textContent = joinTarget.replace(PREFIX, ''); }
+  if (joinTarget) { show('joinBox'); $('joinId').textContent = joinTarget.replace(PREFIX, ''); }
 
   async function unlockCamera() {
     if (camStream) return;
@@ -140,6 +140,7 @@
     begin('host'); await unlockCamera();
     const myId = store('spike_host_id', () => PREFIX + 'm-' + rid());
     peer = new Peer(myId, PEER_OPTS); watchSignal(peer);
+    history.replaceState(null, '', location.pathname + location.search); // drop any old #join so this tab is clearly a host
     const url = location.origin + location.pathname + '#join=' + myId;
     const qr = qrcode(0, 'M'); qr.addData(url, 'Byte'); qr.make();
     $('qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true });
@@ -336,7 +337,7 @@
   });
   $('btnCopyLog').onclick = async () => { try { await navigator.clipboard.writeText(logLines.join('\n')); log('คัดลอกแล้ว', 'ok'); } catch (e) { log('คัดลอกไม่ได้: ' + e.message, 'bad'); } };
 
-  log(`โหลดหน้าแล้ว v2.2 | RTCPeerConnection=${typeof RTCPeerConnection !== 'undefined'} | PeerJS=${typeof Peer !== 'undefined'} | HTTPS=${location.protocol === 'https:'}`);
+  log(`โหลดหน้าแล้ว v2.3 | RTCPeerConnection=${typeof RTCPeerConnection !== 'undefined'} | PeerJS=${typeof Peer !== 'undefined'} | HTTPS=${location.protocol === 'https:'}`);
 })();
 </script>
 </body>
