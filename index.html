@@ -42,6 +42,7 @@
   <div id="joinBox" class="hidden" style="margin-top:8px">
     <p>จะเข้าร่วมวงของเครื่องแม่ <b id="joinId"></b></p>
     <button class="primary" id="btnJoin">เข้าร่วม</button>
+    <button id="btnRescan">ไม่ใช่วงนี้ สแกน QR ใหม่</button>
   </div>
   <p class="muted">ระบบจะขอสิทธิ์กล้อง เพื่อช่วยให้ Safari เชื่อมต่อในวงได้ (ไม่ได้ถ่ายหรือบันทึกภาพ)</p>
 </section>
@@ -309,6 +310,9 @@
   $('btnHost').onclick = guard(startHost);
   $('btnJoin').onclick = guard(() => startGuest(joinTarget));
   $('btnGuestScan').onclick = guard(async () => { await unlockCamera(); const id = await scanJoinUrl(); location.hash = 'join=' + id; await startGuest(id); });
+  $('btnRescan').onclick = $('btnGuestScan').onclick;
+  // Opening a QR link that differs only after '#' reuses the tab without reloading; reload so the new circle id is read.
+  window.addEventListener('hashchange', () => { if (!role) location.reload(); else log('ได้ลิงก์วงใหม่ แต่เครื่องนี้เริ่มไปแล้ว ให้รีโหลดหน้าถ้าจะเปลี่ยนวง', 'warn'); });
   $('btnSend').onclick = () => {
     const text = $('msg').value.trim(); if (!text) return;
     const m = { type: 'chat', id: rid() + rid(), from: myName, text, ts: Date.now() };
@@ -332,7 +336,7 @@
   });
   $('btnCopyLog').onclick = async () => { try { await navigator.clipboard.writeText(logLines.join('\n')); log('คัดลอกแล้ว', 'ok'); } catch (e) { log('คัดลอกไม่ได้: ' + e.message, 'bad'); } };
 
-  log(`โหลดหน้าแล้ว v2.1 | RTCPeerConnection=${typeof RTCPeerConnection !== 'undefined'} | PeerJS=${typeof Peer !== 'undefined'} | HTTPS=${location.protocol === 'https:'}`);
+  log(`โหลดหน้าแล้ว v2.2 | RTCPeerConnection=${typeof RTCPeerConnection !== 'undefined'} | PeerJS=${typeof Peer !== 'undefined'} | HTTPS=${location.protocol === 'https:'}`);
 })();
 </script>
 </body>
