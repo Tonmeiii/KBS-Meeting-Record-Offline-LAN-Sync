@@ -3,83 +3,78 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ทดลองซิงค์ iPhone (ต้นแบบทิ้ง)</title>
+<title>ทดลองซิงค์ iPhone v2 (ต้นแบบทิ้ง)</title>
 <style>
   :root { color-scheme: light dark; --b:#8884; --ok:#1a7f37; --bad:#c62828; --warn:#b26a00; }
   * { box-sizing: border-box; }
-  body { font: 16px/1.45 -apple-system, system-ui, sans-serif; margin: 0; padding: 12px 12px 80px; max-width: 640px; margin-inline: auto; }
+  body { font: 16px/1.45 -apple-system, system-ui, sans-serif; margin: 0 auto; padding: 12px 12px 80px; max-width: 640px; }
   h1 { font-size: 18px; margin: 4px 0 8px; }
   h2 { font-size: 15px; margin: 0 0 8px; }
   section { border: 1px solid var(--b); border-radius: 10px; padding: 10px; margin: 10px 0; }
-  button { font: inherit; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--b); background: #8881; margin: 4px 4px 4px 0; }
+  button { font: inherit; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--b); background: #8881; color: inherit; margin: 4px 4px 4px 0; }
   button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
-  input, textarea { font: inherit; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--b); background: transparent; color: inherit; }
-  textarea { font-family: ui-monospace, monospace; font-size: 12px; height: 70px; }
+  button.okb { background: var(--ok); color: #fff; border-color: var(--ok); }
+  input { font: inherit; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--b); background: transparent; color: inherit; }
   .row { display: flex; gap: 6px; align-items: center; }
   .row > input { flex: 1; }
   .hidden { display: none !important; }
   .muted { opacity: .7; font-size: 13px; }
-  #qr svg { width: 100%; max-width: 360px; height: auto; background: #fff; display: block; margin: 8px auto; }
+  #qr svg { width: 100%; max-width: 280px; height: auto; background: #fff; display: block; margin: 8px auto; }
   video { width: 100%; max-height: 50vh; background: #000; border-radius: 8px; }
-  #peers div, #log div, #chat div { padding: 3px 0; border-bottom: 1px dashed var(--b); font-size: 13px; }
+  #peers > div, #log div, #chat div { padding: 4px 0; border-bottom: 1px dashed var(--b); font-size: 13px; }
   #chat div { font-size: 15px; }
   .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
   #log { max-height: 260px; overflow: auto; font-family: ui-monospace, monospace; }
   .badge { display:inline-block; padding: 1px 8px; border-radius: 99px; border:1px solid currentColor; font-size: 12px; }
+  .big { font-size: 18px; font-weight: 600; }
 </style>
 </head>
 <body>
-<h1>ทดลองซิงค์ iPhone ผ่าน hotspot <span class="badge warn">ต้นแบบทิ้ง</span></h1>
+<h1>ทดลองซิงค์ iPhone v2 <span class="badge warn">ต้นแบบทิ้ง</span></h1>
 
 <section id="setup">
-  <h2>1) ตั้งค่าเครื่องนี้</h2>
+  <h2>ตั้งค่าเครื่องนี้</h2>
   <div class="row"><input id="devName" placeholder="ชื่อเครื่อง เช่น A, B, C"></div>
-  <div style="margin-top:8px">
-    <button class="primary" data-role="host">เป็นเครื่องแม่</button>
-    <button class="primary" data-role="guest">เป็นเครื่องลูก</button>
+  <div id="pickRole" style="margin-top:8px">
+    <button class="primary" id="btnHost">เป็นเครื่องแม่</button>
+    <button id="btnGuestScan">เป็นเครื่องลูก (สแกน QR)</button>
   </div>
-  <p class="muted">ระบบจะขอสิทธิ์กล้องก่อน (ใช้สแกน QR และช่วยให้ Safari เปิดเผย IP ในวง)</p>
+  <div id="joinBox" class="hidden" style="margin-top:8px">
+    <p>จะเข้าร่วมวงของเครื่องแม่ <b id="joinId"></b></p>
+    <button class="primary" id="btnJoin">เข้าร่วม</button>
+  </div>
+  <p class="muted">ระบบจะขอสิทธิ์กล้อง เพื่อช่วยให้ Safari เชื่อมต่อในวงได้ (ไม่ได้ถ่ายหรือบันทึกภาพ)</p>
 </section>
 
-<section id="main" class="hidden">
-  <h2 id="roleTitle"></h2>
-  <div id="hostCtl" class="hidden">
-    <button class="primary" id="btnNewGuest">+ เพิ่มเครื่องลูก (แสดง QR)</button>
-    <button id="btnScanAnswer" class="hidden">สแกน QR คำตอบจากเครื่องลูก</button>
-  </div>
-  <div id="guestCtl" class="hidden">
-    <button class="primary" id="btnScanOffer">สแกน QR จากเครื่องแม่</button>
-  </div>
-  <div id="qrBox" class="hidden">
-    <p id="qrHint" class="muted"></p>
-    <div id="qr"></div>
-    <details><summary class="muted">รหัสแบบข้อความ (สำหรับทดสอบบนคอม)</summary>
-      <textarea id="codeOut" readonly></textarea>
-    </details>
-  </div>
-  <div id="scanBox" class="hidden">
-    <video id="video" playsinline muted></video>
-    <button id="btnStopScan">หยุดสแกน</button>
-  </div>
-  <details style="margin-top:6px"><summary class="muted">วางรหัสแทนการสแกน</summary>
-    <textarea id="codeIn" placeholder="วางรหัส O:... หรือ A:..."></textarea>
-    <button id="btnUseCode">ใช้รหัสนี้</button>
-  </details>
-  <div style="margin-top:6px">
-    <button id="btnWake">เปิดกันจอดับ</button>
-    <span id="wakeState" class="muted"></span>
-  </div>
+<section id="scanBox" class="hidden">
+  <video id="video" playsinline muted></video>
+  <button id="btnStopScan">หยุดสแกน</button>
+</section>
+
+<section id="hostBox" class="hidden">
+  <h2 id="hostTitle"></h2>
+  <p class="muted">ให้เครื่องลูกสแกน QR นี้ (ใช้แอปกล้องปกติก็ได้)</p>
+  <div id="qr"></div>
+  <p class="muted" id="joinUrl" style="word-break:break-all"></p>
+  <div id="pending"></div>
+</section>
+
+<section id="guestBox" class="hidden">
+  <h2 id="guestTitle"></h2>
+  <p id="guestState" class="big"></p>
 </section>
 
 <section id="peersSec" class="hidden">
   <h2>การเชื่อมต่อ</h2>
+  <div id="signal" class="muted"></div>
   <div id="peers"></div>
 </section>
 
 <section id="chatSec" class="hidden">
-  <h2>2) ส่งข้อความทดสอบ</h2>
+  <h2>ส่งข้อความทดสอบ</h2>
   <div class="row"><input id="msg" placeholder="พิมพ์ เช่น โควตา 1234 ลงแล้ว"><button class="primary" id="btnSend">ส่ง</button></div>
   <div id="chat"></div>
+  <div style="margin-top:6px"><button id="btnWake">เปิดกันจอดับ</button> <span id="wakeState" class="muted"></span></div>
 </section>
 
 <section>
@@ -89,233 +84,222 @@
 
 <script src="vendor/qrcode.js"></script>
 <script src="vendor/jsQR.js"></script>
+<script src="vendor/peerjs.min.js"></script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const t0 = performance.now();
+  const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
   const stamp = () => new Date().toLocaleTimeString('th-TH', { hour12: false }) + '.' + String(Date.now() % 1000).padStart(3, '0');
   const logLines = [];
   function log(text, cls) {
-    const line = `[${stamp()}] ${text}`;
-    logLines.push(line);
-    const d = document.createElement('div');
-    d.textContent = line; if (cls) d.className = cls;
-    $('log').prepend(d);
-    console.log('[spike]', line);
+    const line = `[${stamp()}] ${text}`; logLines.push(line);
+    const d = document.createElement('div'); d.textContent = line; if (cls) d.className = cls;
+    $('log').prepend(d); console.log('[spike]', line);
   }
+  const rid = () => Array.from(crypto.getRandomValues(new Uint8Array(5)), b => (b % 36).toString(36)).join('');
+  const store = (k, make) => { let v = localStorage.getItem(k); if (!v) { v = make(); localStorage.setItem(k, v); } return v; };
 
-  let role = null, myName = '', camStream = null;
-  const peers = new Map();       // id -> {id, pc, dc, name, state, lastPong, rtt}
-  let pendingHostPeer = null;     // host: peer waiting for answer
+  // Signaling only goes through PeerJS's free server; data flows directly inside the hotspot.
+  // iceServers: [] => host candidates only, so traffic can never leave the LAN.
+  const PEER_OPTS = { config: { iceServers: [] }, debug: /debug=3/.test(location.search) ? 3 : 1 };
+  const PREFIX = 'kbsspike-';
+
+  let role = null, myName = '', peer = null, camStream = null;
+  const conns = new Map();   // remote peer id -> {conn, name, accepted, lastPong, rtt, route}
+  const accepted = new Set(JSON.parse(localStorage.getItem('spike_accepted') || '[]'));
   const seenMsg = new Set();
 
-  // ---------- encoding SDP <-> short code ----------
-  const b64u = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const unb64u = (s) => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
-  async function pipe(bytes, stream) {
-    const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
-    return new Uint8Array(await out.arrayBuffer());
+  $('devName').value = localStorage.getItem('spike_name') || '';
+  const joinTarget = (/#join=([\w-]+)/.exec(location.hash) || [])[1];
+  if (joinTarget) { show('pickRole', false); show('joinBox'); $('joinId').textContent = joinTarget.replace(PREFIX, ''); }
+
+  async function unlockCamera() {
+    try { camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }); log('ได้สิทธิ์กล้องแล้ว', 'ok'); }
+    catch (e) { log('ไม่ได้สิทธิ์กล้อง: ' + e.message + ' (อาจเชื่อมต่อในวงไม่ได้ ดูผลต่อ)', 'warn'); }
   }
-  function slimSdp(sdp) {
-    // drop lines not needed for a host-only data channel
-    return sdp.split('\r\n').filter(l => l && !/^a=(extmap|rtcp-fb|ssrc|msid)/.test(l)).join('\r\n') + '\r\n';
-  }
-  async function encode(kind, sdp) {
-    const raw = new TextEncoder().encode(slimSdp(sdp));
-    if (typeof CompressionStream !== 'undefined') {
-      try { return kind + 'z:' + b64u(await pipe(raw, new CompressionStream('deflate-raw'))); } catch (e) { log('บีบอัดไม่ได้: ' + e.message, 'warn'); }
-    }
-    return kind + ':' + b64u(raw);
-  }
-  async function decode(code) {
-    code = code.trim();
-    const m = /^([OA])(z?):(.+)$/s.exec(code);
-    if (!m) throw new Error('รูปแบบรหัสไม่ถูกต้อง');
-    let bytes = unb64u(m[3]);
-    if (m[2] === 'z') bytes = await pipe(bytes, new DecompressionStream('deflate-raw'));
-    return { kind: m[1], sdp: new TextDecoder().decode(bytes) };
+  function begin(r) {
+    myName = $('devName').value.trim() || (r === 'host' ? 'แม่' : 'ลูก');
+    localStorage.setItem('spike_name', myName);
+    role = r; show('setup', false); show('peersSec'); show('chatSec');
+    log(`เริ่มเป็น ${r} ชื่อ ${myName} | ${navigator.userAgent}`);
   }
 
-  // ---------- peer connection ----------
-  function describeCandidates(sdp) {
-    return sdp.split('\r\n').filter(l => l.startsWith('a=candidate')).map(l => {
-      const p = l.split(' '); return `${p[2]}/${p[7]} ${p[4]}:${p[5]}`;
+  function watchSignal(p) {
+    p.on('open', id => { $('signal').textContent = 'ตัวจับคู่ออนไลน์: ' + id.replace(PREFIX, ''); log('เชื่อมตัวจับคู่แล้ว id=' + id, 'ok'); });
+    p.on('disconnected', () => { $('signal').textContent = 'ตัวจับคู่หลุด (การเชื่อมต่อที่มีอยู่ยังใช้ได้) กำลังต่อใหม่…'; log('ตัวจับคู่หลุด ลองต่อใหม่', 'warn'); setTimeout(() => { if (!p.destroyed) p.reconnect(); }, 2000); });
+    p.on('error', e => log(`PeerJS error: ${e.type} ${e.message}`, 'bad'));
+  }
+
+  // ---------- host ----------
+  async function startHost() {
+    begin('host'); await unlockCamera();
+    const myId = store('spike_host_id', () => PREFIX + 'm-' + rid());
+    peer = new Peer(myId, PEER_OPTS); watchSignal(peer);
+    const url = location.origin + location.pathname + '#join=' + myId;
+    const qr = qrcode(0, 'M'); qr.addData(url, 'Byte'); qr.make();
+    $('qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 4, scalable: true });
+    $('joinUrl').textContent = url; $('hostTitle').textContent = 'เครื่องแม่: ' + myName; show('hostBox');
+    log(`QR ลิงก์ยาว ${url.length} ตัวอักษร ขนาด ${qr.getModuleCount()} ช่อง`);
+    peer.on('connection', conn => {
+      const name = (conn.metadata && conn.metadata.name) || '?';
+      log(`${name} (${conn.peer.replace(PREFIX, '')}) ขอเข้าร่วม`);
+      const old = conns.get(conn.peer); if (old && old.conn !== conn) old.conn.close();
+      const c = { conn, name, accepted: false, lastPong: 0, rtt: null, route: '' };
+      conns.set(conn.peer, c); wire(c);
+      conn.on('open', () => {
+        if (accepted.has(conn.peer)) { log(`${name} เคยยอมรับแล้ว ต่อกลับอัตโนมัติ`, 'ok'); accept(c); }
+        else renderPending();
+        renderPeers();
+      });
     });
   }
-  function newPeer() {
-    const id = Math.random().toString(36).slice(2, 7);
-    const pc = new RTCPeerConnection({ iceServers: [] });
-    const peer = { id, pc, dc: null, name: '?', state: 'new', lastPong: 0, rtt: null };
-    pc.onconnectionstatechange = () => { peer.state = pc.connectionState; log(`[${peer.name}/${id}] connection=${pc.connectionState}`, pc.connectionState === 'connected' ? 'ok' : (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') ? 'bad' : ''); renderPeers(); };
-    pc.oniceconnectionstatechange = () => log(`[${peer.name}/${id}] ice=${pc.iceConnectionState}`);
-    pc.onicecandidate = (e) => { if (e.candidate) log(`[${id}] candidate ${e.candidate.candidate.split(' ').slice(4, 8).join(' ')}`); };
-    peers.set(id, peer);
-    return peer;
+  function accept(c) {
+    c.accepted = true; accepted.add(c.conn.peer); localStorage.setItem('spike_accepted', JSON.stringify([...accepted]));
+    c.conn.send({ type: 'accepted', host: myName }); log(`ยอมรับ ${c.name}`, 'ok'); renderPending(); renderPeers(); route(c);
   }
-  function waitGather(pc, ms = 4000) {
-    if (pc.iceGatheringState === 'complete') return Promise.resolve();
-    return new Promise(res => {
-      const done = () => { pc.removeEventListener('icegatheringstatechange', chk); res(); };
-      const chk = () => { if (pc.iceGatheringState === 'complete') done(); };
-      pc.addEventListener('icegatheringstatechange', chk);
-      setTimeout(done, ms);
-    });
-  }
-  function bindChannel(peer, dc) {
-    peer.dc = dc;
-    dc.onopen = () => { log(`[${peer.id}] data channel เปิดแล้ว`, 'ok'); send(peer, { type: 'hello', name: myName }); renderPeers(); };
-    dc.onclose = () => { log(`[${peer.name}/${peer.id}] data channel ปิด`, 'bad'); renderPeers(); };
-    dc.onerror = (e) => log(`[${peer.id}] dc error ${e.error ? e.error.message : ''}`, 'bad');
-    dc.onmessage = (e) => onMessage(peer, JSON.parse(e.data));
-  }
-  function send(peer, obj) { if (peer.dc && peer.dc.readyState === 'open') peer.dc.send(JSON.stringify(obj)); }
-  function broadcast(obj, exceptId) { for (const p of peers.values()) if (p.id !== exceptId) send(p, obj); }
-
-  function onMessage(peer, m) {
-    if (m.type === 'hello') { peer.name = m.name || '?'; log(`[${peer.id}] รู้จักกันแล้ว: ${peer.name}`, 'ok'); renderPeers(); return; }
-    if (m.type === 'ping') { send(peer, { type: 'pong', t: m.t }); return; }
-    if (m.type === 'pong') { peer.lastPong = Date.now(); peer.rtt = Math.round(performance.now() - m.t); renderPeers(); return; }
-    if (m.type === 'chat') {
-      if (seenMsg.has(m.id)) return; seenMsg.add(m.id);
-      showChat(m, false);
-      if (role === 'host') broadcast(m, peer.id); // relay to other guests
-    }
-  }
-  function showChat(m, mine) {
-    const d = document.createElement('div');
-    const lag = Date.now() - m.ts;
-    d.innerHTML = `<b></b> <span></span> <span class="muted"></span>`;
-    d.children[0].textContent = (mine ? 'ฉัน' : m.from) + ':';
-    d.children[1].textContent = m.text;
-    d.children[2].textContent = mine ? '' : `(ถึงใน ~${lag} ms)`;
-    $('chat').prepend(d);
-  }
-
-  setInterval(() => { for (const p of peers.values()) send(p, { type: 'ping', t: performance.now() }); renderPeers(); }, 2000);
-
-  function renderPeers() {
-    const box = $('peers'); box.innerHTML = '';
-    if (!peers.size) { box.innerHTML = '<div class="muted">ยังไม่มี</div>'; return; }
-    for (const p of peers.values()) {
-      const alive = p.lastPong && Date.now() - p.lastPong < 5000;
-      const d = document.createElement('div');
-      d.className = alive ? 'ok' : (p.state === 'connected' ? 'warn' : 'bad');
-      d.textContent = `${p.name} (${p.id}) — ${p.state}, ช่อง=${p.dc ? p.dc.readyState : '-'}, ${alive ? 'ตอบสนอง ' + p.rtt + ' ms' : 'ไม่ตอบสนอง'}`;
+  function reject(c) { c.conn.send({ type: 'rejected' }); setTimeout(() => c.conn.close(), 300); conns.delete(c.conn.peer); log(`ปฏิเสธ ${c.name}`, 'warn'); renderPending(); renderPeers(); }
+  function renderPending() {
+    const box = $('pending'); box.innerHTML = '';
+    for (const c of conns.values()) {
+      if (c.accepted || !c.conn.open) continue;
+      const d = document.createElement('div'); d.style.cssText = 'padding:8px;border:1px solid var(--warn);border-radius:8px;margin:6px 0';
+      d.innerHTML = `<div class="big"></div><button class="okb">ยอมรับ</button><button>ปฏิเสธ</button>`;
+      d.firstChild.textContent = `${c.name} ขอเข้าร่วม`;
+      d.children[1].onclick = () => accept(c); d.children[2].onclick = () => reject(c);
       box.appendChild(d);
     }
   }
 
-  // ---------- QR show / scan ----------
-  function showCode(code, hint) {
-    const qr = qrcode(0, 'L'); qr.addData(code, 'Byte'); qr.make();
-    $('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 4, scalable: true });
-    $('codeOut').value = code;
-    $('qrHint').textContent = `${hint} (ยาว ${code.length} ตัวอักษร, QR ขนาด ${qr.getModuleCount()} ช่อง)`;
-    $('qrBox').classList.remove('hidden');
-    log(`แสดง QR ยาว ${code.length} ตัวอักษร`);
+  // ---------- guest ----------
+  let reconnectTimer = null, hostId = null;
+  async function startGuest(target) {
+    begin('guest'); await unlockCamera();
+    hostId = target;
+    $('guestTitle').textContent = 'เครื่องลูก: ' + myName; show('guestBox');
+    const myId = store('spike_guest_id', () => PREFIX + 'g-' + rid());
+    peer = new Peer(myId, PEER_OPTS); watchSignal(peer);
+    peer.on('open', () => connectHost());
   }
+  function connectHost() {
+    clearTimeout(reconnectTimer);
+    if (!peer || peer.destroyed) return;
+    const cur = conns.get(hostId); if (cur && cur.conn.open) return;
+    setGuestState('กำลังเชื่อมต่อเครื่องแม่…', 'warn');
+    const conn = peer.connect(hostId, { metadata: { name: myName }, serialization: 'json', reliable: true });
+    const c = { conn, name: 'เครื่องแม่', accepted: false, lastPong: 0, rtt: null, route: '' };
+    conns.set(hostId, c); wire(c);
+    conn.on('open', () => { setGuestState('รอเครื่องแม่กดยอมรับ…', 'warn'); renderPeers(); });
+    setTimeout(() => { if (!conn.open) { log('ต่อไม่ติดใน 15 วิ ลองใหม่', 'bad'); conn.close(); scheduleReconnect(); } }, 15000);
+  }
+  function scheduleReconnect() { clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connectHost, 3000); }
+  function setGuestState(t, cls) { $('guestState').textContent = t; $('guestState').className = 'big ' + (cls || ''); }
+
+  // ---------- shared ----------
+  function wire(c) {
+    c.conn.on('data', m => onMessage(c, m));
+    c.conn.on('close', () => {
+      log(`${c.name} ปิดการเชื่อมต่อ`, 'bad'); renderPending(); renderPeers();
+      if (role === 'guest' && conns.get(hostId) === c) { setGuestState('หลุดจากเครื่องแม่ กำลังต่อใหม่…', 'bad'); scheduleReconnect(); }
+    });
+    c.conn.on('error', e => log(`${c.name} error ${e.type || ''} ${e.message}`, 'bad'));
+    c.conn.on('iceStateChanged', s => { log(`${c.name} ice=${s}`, s === 'connected' ? 'ok' : (s === 'failed' || s === 'disconnected') ? 'bad' : ''); renderPeers(); });
+  }
+  function onMessage(c, m) {
+    if (m.type === 'ping') { c.conn.send({ type: 'pong', t: m.t }); return; }
+    if (m.type === 'pong') { c.lastPong = Date.now(); c.rtt = Math.round(performance.now() - m.t); return; }
+    if (m.type === 'accepted') { c.accepted = true; c.name = 'เครื่องแม่ ' + m.host; setGuestState('เข้าร่วมวงแล้ว ✓', 'ok'); log('เครื่องแม่ยอมรับแล้ว', 'ok'); route(c); renderPeers(); return; }
+    if (m.type === 'rejected') { setGuestState('เครื่องแม่ปฏิเสธ', 'bad'); clearTimeout(reconnectTimer); peer.destroy(); return; }
+    if (m.type === 'chat') {
+      if (!c.accepted || seenMsg.has(m.id)) return; seenMsg.add(m.id); showChat(m, false);
+      if (role === 'host') broadcast(m, c.conn.peer);
+    }
+  }
+  function broadcast(m, except) { for (const [id, c] of conns) if (id !== except && c.accepted && c.conn.open) c.conn.send(m); }
+  function showChat(m, mine) {
+    const d = document.createElement('div'); d.innerHTML = '<b></b> <span></span> <span class="muted"></span>';
+    d.children[0].textContent = (mine ? 'ฉัน' : m.from) + ':'; d.children[1].textContent = m.text;
+    d.children[2].textContent = mine ? '' : `(ถึงใน ~${Date.now() - m.ts} ms)`; $('chat').prepend(d);
+  }
+  async function route(c) {
+    // Show which path the data actually takes: host<->host with LAN IPs means it never touched the internet.
+    try {
+      const pc = c.conn.peerConnection; if (!pc) return;
+      const st = await pc.getStats(); let pair = null; const by = {};
+      st.forEach(r => { by[r.id] = r; });
+      st.forEach(r => { if (r.type === 'transport' && r.selectedCandidatePairId) pair = by[r.selectedCandidatePairId]; });
+      if (!pair) st.forEach(r => { if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') pair = r; });
+      if (!pair) { c.route = 'ยังไม่รู้เส้นทาง'; return; }
+      const L = by[pair.localCandidateId] || {}, R = by[pair.remoteCandidateId] || {};
+      c.route = `${L.candidateType} ${L.address || L.ip || '?'} ↔ ${R.candidateType} ${R.address || R.ip || '?'}`;
+      log(`เส้นทางข้อมูลกับ ${c.name}: ${c.route}`, 'ok'); renderPeers();
+    } catch (e) { log('อ่านเส้นทางไม่ได้: ' + e.message, 'warn'); }
+  }
+  function renderPeers() {
+    const box = $('peers'); box.innerHTML = '';
+    if (!conns.size) { box.innerHTML = '<div class="muted">ยังไม่มี</div>'; return; }
+    for (const c of conns.values()) {
+      const alive = c.lastPong && Date.now() - c.lastPong < 5000;
+      const d = document.createElement('div');
+      d.className = alive && c.accepted ? 'ok' : c.conn.open ? 'warn' : 'bad';
+      d.textContent = `${c.name}: ${c.conn.open ? 'เปิด' : 'ปิด'}, ${c.accepted ? 'ยอมรับแล้ว' : 'ยังไม่ยอมรับ'}, ${alive ? 'ตอบสนอง ' + c.rtt + ' ms' : 'ไม่ตอบสนอง'}${c.route ? ' | ' + c.route : ''}`;
+      box.appendChild(d);
+    }
+  }
+  setInterval(() => { for (const c of conns.values()) if (c.conn.open) c.conn.send({ type: 'ping', t: performance.now() }); renderPeers(); }, 2000);
+
+  // ---------- in-page scanner (alternative to the Camera app) ----------
   let scanning = false;
-  async function scan() {
-    $('scanBox').classList.remove('hidden');
-    const video = $('video');
+  async function scanJoinUrl() {
+    show('scanBox'); const video = $('video');
     if (!camStream) camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     video.srcObject = camStream; await video.play();
-    const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const cv = document.createElement('canvas'), ctx = cv.getContext('2d', { willReadFrequently: true });
     scanning = true;
-    return new Promise((resolve, reject) => {
+    return new Promise((res, rej) => {
       const tick = () => {
-        if (!scanning) { reject(new Error('หยุดสแกน')); return; }
+        if (!scanning) return rej(new Error('หยุดสแกน'));
         if (video.readyState >= 2) {
-          const w = Math.min(800, video.videoWidth), h = Math.round(video.videoHeight * w / video.videoWidth);
-          canvas.width = w; canvas.height = h; ctx.drawImage(video, 0, 0, w, h);
-          const res = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
-          if (res && /^[OA]z?:/.test(res.data)) { scanning = false; $('scanBox').classList.add('hidden'); resolve(res.data); return; }
+          const w = Math.min(640, video.videoWidth), h = Math.round(video.videoHeight * w / video.videoWidth);
+          cv.width = w; cv.height = h; ctx.drawImage(video, 0, 0, w, h);
+          const r = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
+          const m = r && /#join=([\w-]+)/.exec(r.data);
+          if (m) { scanning = false; show('scanBox', false); return res(m[1]); }
         }
         requestAnimationFrame(tick);
       };
       tick();
     });
   }
-  $('btnStopScan').onclick = () => { scanning = false; $('scanBox').classList.add('hidden'); };
+  $('btnStopScan').onclick = () => { scanning = false; show('scanBox', false); };
 
-  // ---------- flows ----------
-  async function hostNewGuest() {
-    if (pendingHostPeer && pendingHostPeer.state === 'new') { pendingHostPeer.pc.close(); peers.delete(pendingHostPeer.id); }
-    const peer = newPeer(); pendingHostPeer = peer;
-    bindChannel(peer, peer.pc.createDataChannel('sync', { ordered: true }));
-    await peer.pc.setLocalDescription(await peer.pc.createOffer());
-    await waitGather(peer.pc);
-    const sdp = peer.pc.localDescription.sdp;
-    log(`offer candidates: ${describeCandidates(sdp).join(' | ') || 'ไม่มี!'}`, describeCandidates(sdp).length ? '' : 'bad');
-    showCode(await encode('O', sdp), 'ให้เครื่องลูกสแกน QR นี้');
-    $('btnScanAnswer').classList.remove('hidden');
-    renderPeers();
-  }
-  async function hostApplyAnswer(code) {
-    const { kind, sdp } = await decode(code);
-    if (kind !== 'A') throw new Error('นี่ไม่ใช่รหัสคำตอบ (A:)');
-    if (!pendingHostPeer) throw new Error('ยังไม่ได้กด เพิ่มเครื่องลูก');
-    log(`answer candidates: ${describeCandidates(sdp).join(' | ') || 'ไม่มี!'}`);
-    await pendingHostPeer.pc.setRemoteDescription({ type: 'answer', sdp });
-    pendingHostPeer = null;
-    $('qrBox').classList.add('hidden'); $('btnScanAnswer').classList.add('hidden');
-    log('ใส่คำตอบแล้ว รอเชื่อมต่อ…');
-  }
-  async function guestApplyOffer(code) {
-    const { kind, sdp } = await decode(code);
-    if (kind !== 'O') throw new Error('นี่ไม่ใช่รหัสจากเครื่องแม่ (O:)');
-    for (const p of peers.values()) { p.pc.close(); } peers.clear(); // guest has one host
-    const peer = newPeer(); peer.name = 'เครื่องแม่';
-    peer.pc.ondatachannel = (e) => bindChannel(peer, e.channel);
-    log(`offer candidates: ${describeCandidates(sdp).join(' | ') || 'ไม่มี!'}`);
-    await peer.pc.setRemoteDescription({ type: 'offer', sdp });
-    await peer.pc.setLocalDescription(await peer.pc.createAnswer());
-    await waitGather(peer.pc);
-    showCode(await encode('A', peer.pc.localDescription.sdp), 'ให้เครื่องแม่กด "สแกน QR คำตอบ" แล้วสแกน QR นี้');
-    renderPeers();
-  }
   const guard = (fn) => async (...a) => { try { await fn(...a); } catch (e) { log('ผิดพลาด: ' + e.message, 'bad'); } };
-
-  document.querySelectorAll('[data-role]').forEach(b => b.onclick = guard(async () => {
-    myName = $('devName').value.trim() || (b.dataset.role === 'host' ? 'แม่' : 'ลูก');
-    role = b.dataset.role;
-    try { camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }); log('ได้สิทธิ์กล้องแล้ว', 'ok'); }
-    catch (e) { log('ไม่ได้สิทธิ์กล้อง: ' + e.message + ' (ยังวางรหัสแทนได้)', 'warn'); }
-    $('setup').classList.add('hidden'); $('main').classList.remove('hidden');
-    $('peersSec').classList.remove('hidden'); $('chatSec').classList.remove('hidden');
-    $('roleTitle').textContent = (role === 'host' ? 'เครื่องแม่: ' : 'เครื่องลูก: ') + myName;
-    $(role === 'host' ? 'hostCtl' : 'guestCtl').classList.remove('hidden');
-    log(`เริ่มเป็น ${role} ชื่อ ${myName} | UA: ${navigator.userAgent}`);
-    renderPeers();
-  }));
-  $('btnNewGuest').onclick = guard(hostNewGuest);
-  $('btnScanAnswer').onclick = guard(async () => hostApplyAnswer(await scan()));
-  $('btnScanOffer').onclick = guard(async () => guestApplyOffer(await scan()));
-  $('btnUseCode').onclick = guard(async () => {
-    const code = $('codeIn').value; $('codeIn').value = '';
-    if (role === 'host') await hostApplyAnswer(code); else await guestApplyOffer(code);
-  });
+  $('btnHost').onclick = guard(startHost);
+  $('btnJoin').onclick = guard(() => startGuest(joinTarget));
+  $('btnGuestScan').onclick = guard(async () => { await unlockCamera(); const id = await scanJoinUrl(); location.hash = 'join=' + id; await startGuest(id); });
   $('btnSend').onclick = () => {
     const text = $('msg').value.trim(); if (!text) return;
-    const m = { type: 'chat', id: Math.random().toString(36).slice(2), from: myName, text, ts: Date.now() };
+    const m = { type: 'chat', id: rid() + rid(), from: myName, text, ts: Date.now() };
     seenMsg.add(m.id); broadcast(m); showChat(m, true); $('msg').value = '';
   };
   $('msg').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnSend').click(); });
 
   let wakeLock = null;
   $('btnWake').onclick = guard(async () => {
-    if (!('wakeLock' in navigator)) { $('wakeState').textContent = 'เครื่องนี้ไม่รองรับ'; log('ไม่รองรับ Wake Lock', 'warn'); return; }
-    wakeLock = await navigator.wakeLock.request('screen');
-    $('wakeState').textContent = 'เปิดอยู่'; log('เปิดกันจอดับแล้ว', 'ok');
+    if (!('wakeLock' in navigator)) { $('wakeState').textContent = 'ไม่รองรับ'; return; }
+    wakeLock = await navigator.wakeLock.request('screen'); $('wakeState').textContent = 'เปิดอยู่'; log('เปิดกันจอดับ', 'ok');
     wakeLock.addEventListener('release', () => { $('wakeState').textContent = 'ถูกปล่อย'; log('กันจอดับถูกปล่อย', 'warn'); });
   });
   document.addEventListener('visibilitychange', () => {
     log('หน้าเว็บ ' + (document.hidden ? 'ถูกซ่อน (จอดับ/สลับแอป)' : 'กลับมาแสดง'), document.hidden ? 'warn' : '');
-    if (!document.hidden && wakeLock && wakeLock.released) $('btnWake').click();
+    if (!document.hidden) {
+      if (wakeLock && wakeLock.released) $('btnWake').click();
+      if (peer && peer.disconnected && !peer.destroyed) peer.reconnect();
+      if (role === 'guest') connectHost();
+    }
   });
-  $('btnCopyLog').onclick = async () => { try { await navigator.clipboard.writeText(logLines.join('\n')); log('คัดลอกบันทึกแล้ว', 'ok'); } catch (e) { log('คัดลอกไม่ได้: ' + e.message, 'bad'); } };
+  $('btnCopyLog').onclick = async () => { try { await navigator.clipboard.writeText(logLines.join('\n')); log('คัดลอกแล้ว', 'ok'); } catch (e) { log('คัดลอกไม่ได้: ' + e.message, 'bad'); } };
 
-  log(`โหลดหน้าแล้ว | RTCPeerConnection=${typeof RTCPeerConnection !== 'undefined'} | CompressionStream=${typeof CompressionStream !== 'undefined'} | HTTPS=${location.protocol === 'https:'}`);
+  log(`โหลดหน้าแล้ว v2 | RTCPeerConnection=${typeof RTCPeerConnection !== 'undefined'} | PeerJS=${typeof Peer !== 'undefined'} | HTTPS=${location.protocol === 'https:'}`);
 })();
 </script>
 </body>
